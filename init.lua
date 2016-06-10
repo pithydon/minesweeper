@@ -58,6 +58,15 @@ minetest.register_craftitem("minesweeper:mine", {
   end
 })
 
+minetest.register_craft({
+	output = "minesweeper:mine",
+	recipe = {
+		{"default:steel_ingot", "default:steel_ingot", "default:steel_ingot"},
+		{"", "tnt:tnt", ""},
+		{"default:steel_ingot", "default:steel_ingot", "default:steel_ingot"}
+	}
+})
+
 for i=1,26 do
 	minetest.register_node("minesweeper:num_"..i, {
 		description = "Minesweeper Number",
