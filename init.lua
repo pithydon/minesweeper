@@ -32,14 +32,15 @@ minetest.register_craftitem("minesweeper:mine", {
   wield_image = "minesweeper_mine.png",
   on_place = function(itemstack, placer, pointed_thing)
     if pointed_thing.type == "node" then
-      local ipos = minetest.get_pointed_thing_position(pointed_thing, above)
-      local inode = minetest.get_node(ipos)
-			local inode2 = minetest.registered_nodes[inode.name]
-			local pos
-			if inode2.buildable_to then
-				pos = {x = ipos.x, y = ipos.y - 1, z = ipos.z}
-			else
-				pos = ipos
+      local pos = minetest.get_pointed_thing_position(pointed_thing, above)
+      local node = minetest.get_node(pos)
+			local node = minetest.registered_nodes[node.name]
+			if node.buildable_to then
+				pos = {x = pos.x, y = pos.y - 1, z = pos.z}
+			end
+			if minetest.is_protected(pos, placer:get_player_name()) then
+				minetest.record_protection_violation(pos, placer:get_player_name())
+				return
 			end
 			local node = minetest.get_node(pos)
       if node.name == "default:dirt" or node.name == "default:dirt_with_grass"
@@ -58,12 +59,36 @@ minetest.register_craftitem("minesweeper:mine", {
   end
 })
 
+minetest.register_node("minesweeper:flag", {
+	description = "Minesweeper Flag",
+	drawtype = "torchlike",
+	paramtype = "light",
+	tiles = {"minesweeper_flag.png"},
+	inventory_image = "minesweeper_flag.png",
+	wield_image = "minesweeper_flag.png",
+	walkable = false,
+	buildable_to = true,
+	groups = {dig_immediate = 2},
+	selection_box = {
+		type = "fixed",
+		fixed = {-0.25, -0.5, -0.25, 0.25, 0.3125, 0.25}
+	}
+})
+
 minetest.register_craft({
 	output = "minesweeper:mine",
 	recipe = {
 		{"default:steel_ingot", "default:steel_ingot", "default:steel_ingot"},
 		{"", "tnt:tnt", ""},
 		{"default:steel_ingot", "default:steel_ingot", "default:steel_ingot"}
+	}
+})
+
+minetest.register_craft({
+	output = "minesweeper:flag",
+	recipe = {
+		{"wool:red"},
+		{"default:stick"}
 	}
 })
 
@@ -155,11 +180,9 @@ end
 minetest.register_globalstep(function(dtime)
 	for k,v in pairs(minesweeper.mines) do
     local above = {x = v.x, y = v.y + 1, z = v.z}
-    local upper_node = minetest.get_node(above)
-    local upper_node2 = minetest.registered_nodes[upper_node.name]
-    local node = minetest.get_node(v)
-    local node2 = minetest.registered_nodes[node.name]
-    if not upper_node2.buildable_to then
+    local node = minetest.get_node(above)
+    local node = minetest.registered_nodes[node.name]
+    if not node.buildable_to then
       boom(v)
       table.remove(minesweeper.mines, k)
     else
@@ -170,7 +193,7 @@ minetest.register_globalstep(function(dtime)
       else
         local objects = minetest.get_objects_inside_radius(above, 1)
         for k2,p in pairs(objects) do
-          if p:get_player_name() ~= "" then
+          if p:is_player() then
             boom(v)
             table.remove(minesweeper.mines, k)
           end
