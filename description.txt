@@ -1,0 +1,1 @@
+Place mines and play minesweeper or use them as traps.
