@@ -137,6 +137,65 @@ minetest.register_globalstep(function(dtime)
 	end
 end)
 
+minetest.register_abm({
+	nodenames = {
+		"minesweeper:num_1",
+		"minesweeper:num_2",
+		"minesweeper:num_3",
+		"minesweeper:num_4",
+		"minesweeper:num_5",
+		"minesweeper:num_6",
+		"minesweeper:num_7",
+		"minesweeper:num_8",
+		"minesweeper:num_9",
+		"minesweeper:num_10",
+		"minesweeper:num_11",
+		"minesweeper:num_12",
+		"minesweeper:num_13",
+		"minesweeper:num_14",
+		"minesweeper:num_15",
+		"minesweeper:num_16",
+		"minesweeper:num_17",
+		"minesweeper:num_18",
+		"minesweeper:num_19",
+		"minesweeper:num_20",
+		"minesweeper:num_21",
+		"minesweeper:num_22",
+		"minesweeper:num_23",
+		"minesweeper:num_24",
+		"minesweeper:num_25",
+		"minesweeper:num_26"
+	},
+	interval = 1,
+	chance = 1,
+	action = function(pos, node)
+		local ontopof = minetest.get_meta({x = pos.x, y = pos.y - 1, z = pos.z})
+		if ontopof:get_string("minesweeper") == "mine" then
+			for i,v in ipairs(minesweeper.mines) do
+				local posv = minetest.pos_to_string(v)
+				local poss = minetest.pos_to_string({x = pos.x, y = pos.y - 1, z = pos.z})
+				if posv == poss then
+					table.remove(minesweeper.mines, i)
+				end
+			end
+			boom({x = pos.x, y = pos.y - 1, z = pos.z})
+		end
+		local nodes = minetest.find_nodes_in_area({x = pos.x - 1, y = pos.y - 2, z = pos.z - 1}, {x = pos.x + 1, y = pos.y, z = pos.z + 1}, {"group:place_mine"})
+		local mines = {}
+		for _,v in ipairs(nodes) do
+			local meta = minetest.get_meta(v)
+			if meta:get_string("minesweeper") == "mine" then
+				table.insert(mines, v)
+			end
+		end
+		if mines[1] then
+			minetest.swap_node(pos, {name = "minesweeper:num_"..#mines, param2 = 1})
+		else
+			minetest.remove_node(pos)
+		end
+	end
+})
+
 minetest.register_lbm({
 	name = "minesweeper:look_for_mines",
 	nodenames = {"group:place_mine"},
