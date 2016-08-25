@@ -1,4 +1,4 @@
-# minesweeper by [pithydon]
+minesweeper by [pithydon]
 
 Play minesweeper in Minetest.
 
