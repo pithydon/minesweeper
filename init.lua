@@ -118,19 +118,18 @@ end
 
 minetest.register_globalstep(function(dtime)
 	for i,v in ipairs(mine_index) do
-		local above = {x = v.x, y = v.y + 1, z = v.z}
-		local node = minetest.get_node(above)
+		local node = minetest.get_node({x = v.x, y = v.y + 1, z = v.z})
 		local node = minetest.registered_nodes[node.name]
 		if not node.buildable_to then
 			boom(v)
 			table.remove(mine_index, i)
 		else
-			local objects = minetest.get_objects_inside_radius(above, 0.5)
+			local objects = minetest.get_objects_inside_radius({x = v.x, y = v.y + 1, z = v.z}, 0.5)
 			if objects[1] then
 				boom(v)
 				table.remove(mine_index, i)
 			else
-				local objects = minetest.get_objects_inside_radius(above, 1)
+				local objects = minetest.get_objects_inside_radius({x = v.x, y = v.y + 0.1, z = v.z}, 0.8)
 				for _,p in ipairs(objects) do
 					if p:is_player() then
 						boom(v)
@@ -223,6 +222,31 @@ minetest.register_lbm({
 	end
 })
 
+minetest.register_on_punchnode(function(pos, node, puncher, pointed_thing)
+	local node_def = minetest.registered_nodes[node.name]
+	if node_def.drawtype == "normal" and node_def.walkable and not node_def.buildable_to then
+		local item_name = puncher:get_wielded_item():get_name()
+		if item_name == "default:stick" or item_name == "minesweeper:flag" then
+			local nodes = minetest.find_nodes_in_area({x = pos.x - 1, y = pos.y - 1, z = pos.z - 1}, {x = pos.x + 1, y = pos.y + 1, z = pos.z + 1}, {"group:place_mine"})
+			local mines = {}
+			for _,v in ipairs(nodes) do
+				local meta = minetest.get_meta(v)
+				if meta:get_string("minesweeper") == "mine" then
+					table.insert(mines, v)
+				end
+			end
+			if mines[1] then
+				local above = {x = pos.x, y = pos.y + 1, z = pos.z}
+				local node = minetest.get_node(above)
+				local node_def = minetest.registered_nodes[node.name]
+				if node_def.buildable_to then
+					minetest.swap_node(above, {name = "minesweeper:num_"..#mines, param2 = 1})
+				end
+			end
+		end
+	end
+end)
+
 function minesweeper.register_placable(v)
 	local v_def = minetest.registered_nodes[v]
 	local groups = table.copy(v_def.groups)
@@ -231,7 +255,6 @@ function minesweeper.register_placable(v)
 		groups = groups,
 		on_punch = function(pos, node, puncher, pointed_thing)
 			local meta = minetest.get_meta(pos)
-			local item_name = puncher:get_wielded_item():get_name()
 			if meta:get_string("minesweeper") == "mine" then
 				for i,v in ipairs(mine_index) do
 					local posv = minetest.pos_to_string(v)
@@ -241,23 +264,8 @@ function minesweeper.register_placable(v)
 					end
 				end
 				boom(pos)
-			elseif item_name == "default:stick" or item_name == "minesweeper:flag" then
-				local nodes = minetest.find_nodes_in_area({x = pos.x - 1, y = pos.y - 1, z = pos.z - 1}, {x = pos.x + 1, y = pos.y + 1, z = pos.z + 1}, {"group:place_mine"})
-				local mines = {}
-				for _,v in ipairs(nodes) do
-					local meta = minetest.get_meta(v)
-					if meta:get_string("minesweeper") == "mine" then
-						table.insert(mines, v)
-					end
-				end
-				if mines[1] then
-					local above = {x = pos.x, y = pos.y + 1, z = pos.z}
-					local node = minetest.get_node(above)
-					local node_def = minetest.registered_nodes[node.name]
-					if node_def.buildable_to then
-						minetest.swap_node(above, {name = "minesweeper:num_"..#mines, param2 = 1})
-					end
-				end
+			else
+				minetest.node_punch(pos, node, puncher, pointed_thing)
 			end
 		end,
 		on_blast = function(pos, intensity)
@@ -285,8 +293,16 @@ local override_nodes = {
 	"default:dirt_with_grass_footsteps",
 	"default:dirt_with_dry_grass",
 	"default:dirt_with_snow",
+	"default:dirt_with_rainforest_litter",
+	"default:dirt_with_coniferous_litter",
+	"default:dry_dirt",
+	"default:dry_dirt_with_dry_grass",
+	"default:permafrost",
+	"default:permafrost_with_stones",
+	"default:permafrost_with_moss",
 	"default:sand",
 	"default:desert_sand",
+	"default:silver_sand",
 	"default:gravel",
 	"default:clay",
 	"default:snowblock"
@@ -294,3 +310,39 @@ local override_nodes = {
 for _,v in ipairs(override_nodes) do
 	minesweeper.register_placable(v)
 end
+
+minetest.override_item("default:snow", {
+	on_punch = function(pos, node, puncher, pointed_thing)
+		local below = {x = pos.x, y = pos.y - 1, z = pos.z}
+		local meta = minetest.get_meta(below)
+		local item_name = puncher:get_wielded_item():get_name()
+		if meta:get_string("minesweeper") == "mine" then
+			for i,v in ipairs(mine_index) do
+				local posv = minetest.pos_to_string(v)
+				local poss = minetest.pos_to_string(below)
+				if posv == poss then
+					table.remove(mine_index, i)
+				end
+			end
+			boom(below)
+		elseif item_name == "default:stick" or item_name == "minesweeper:flag" then
+			local node = minetest.get_node(below)
+			local node_def = minetest.registered_nodes[node.name]
+			if node_def.drawtype == "normal" and node_def.walkable and not node_def.buildable_to then
+				local nodes = minetest.find_nodes_in_area({x = below.x - 1, y = below.y - 1, z = below.z - 1}, {x = below.x + 1, y = below.y + 1, z = below.z + 1}, {"group:place_mine"})
+				local mines = {}
+				for _,v in ipairs(nodes) do
+					local meta = minetest.get_meta(v)
+					if meta:get_string("minesweeper") == "mine" then
+						table.insert(mines, v)
+					end
+				end
+				if mines[1] then
+					minetest.swap_node(pos, {name = "minesweeper:num_"..#mines, param2 = 1})
+				end
+			end
+		else
+			minetest.node_punch(pos, node, puncher, pointed_thing)
+		end
+	end,
+})

@@ -1,4 +1,4 @@
-minesweeper v1.0
+minesweeper
 
 Play minesweeper in Minetest.
 
