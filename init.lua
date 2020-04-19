@@ -70,6 +70,7 @@ minetest.register_node("minesweeper:flag", {
 	tiles = {"minesweeper_flag.png"},
 	inventory_image = "minesweeper_flag.png",
 	wield_image = "minesweeper_flag.png",
+	sunlight_propagates = true,
 	walkable = false,
 	buildable_to = true,
 	groups = {dig_immediate = 3},
@@ -77,6 +78,32 @@ minetest.register_node("minesweeper:flag", {
 		type = "fixed",
 		fixed = {-0.25, -0.5, -0.25, 0.25, 0.3125, 0.25}
 	}
+})
+
+minetest.register_node("minesweeper:sign", {
+	description = "Minefield Warning Sign",
+	drawtype = "nodebox",
+	paramtype = "light",
+	paramtype2 = "facedir",
+	tiles = {"minesweeper_sign.png"},
+	inventory_image = "minesweeper_sign_inv.png",
+	wield_image = "minesweeper_sign_inv.png",
+	sunlight_propagates = true,
+	walkable = false,
+	buildable_to = false,
+	groups = {cracky = 2, attached_node = 1},
+	sounds = default.node_sound_wood_defaults(),
+	node_box = {
+		type = "fixed",
+		fixed = {
+			{-0.375, -0.25, 0.4375, 0.375, 0.5, 0.5},
+			{-0.0625, -0.5, 0.4375, 0.0625, -0.25, 0.5}
+		}
+	},
+	on_construct = function(pos)
+		local meta = minetest.get_meta(pos)
+		meta:set_string("infotext", "Minefield!")
+	end
 })
 
 minetest.register_craft({
@@ -96,6 +123,12 @@ minetest.register_craft({
 	}
 })
 
+minetest.register_craft({
+	type = "shapeless",
+	output = "minesweeper:sign",
+	recipe = {"default:sign_wall_wood", "minesweeper:flag"}
+})
+
 for i=1,26 do
 	minetest.register_node("minesweeper:num_"..i, {
 		description = "Minesweeper Number",
@@ -103,6 +136,7 @@ for i=1,26 do
 		paramtype = "light",
 		paramtype2 = "wallmounted",
 		tiles = {"minesweeper_num_"..i..".png"},
+		sunlight_propagates = true,
 		walkable = false,
 		buildable_to = true,
 		groups = {dig_immediate = 2, not_in_creative_inventory = 1},
