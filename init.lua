@@ -63,6 +63,52 @@ minetest.register_craftitem("minesweeper:mine", {
 	end
 })
 
+minetest.register_craftitem("minesweeper:detector", {
+	description = "Mine Detector Tool",
+	inventory_image = "minesweeper_detector.png",
+	wield_image = "minesweeper_detector.png",
+	on_place = function(itemstack, placer, pointed_thing)
+		local pos = placer:get_pos()
+		local flag = false
+		for _,v in ipairs(mine_index) do
+			if vector.distance(pos, v) < 16 then
+				local node = minetest.get_node({x = v.x, y = v.y + 1, z = v.z})
+				if node.name ~= "minesweeper:flag" then
+					minetest.chat_send_player(placer:get_player_name(), "Unflaged mines detected nearby.")
+					return
+				else
+					flag = true
+				end
+			end
+		end
+		if flag then
+			minetest.chat_send_player(placer:get_player_name(), "No unflaged mines detected.")
+		else
+			minetest.chat_send_player(placer:get_player_name(), "No mines detected.")
+		end
+	end,
+	on_secondary_use = function(itemstack, user, pointed_thing)
+		local pos = user:get_pos()
+		local flag = false
+		for _,v in ipairs(mine_index) do
+			if vector.distance(pos, v) < 16 then
+				local node = minetest.get_node({x = v.x, y = v.y + 1, z = v.z})
+				if node.name ~= "minesweeper:flag" then
+					minetest.chat_send_player(user:get_player_name(), "Unflaged mines detected nearby.")
+					return
+				else
+					flag = true
+				end
+			end
+		end
+		if flag then
+			minetest.chat_send_player(user:get_player_name(), "No unflaged mines detected.")
+		else
+			minetest.chat_send_player(user:get_player_name(), "No mines detected.")
+		end
+	end
+})
+
 minetest.register_node("minesweeper:flag", {
 	description = "Minesweeper Flag",
 	drawtype = "torchlike",
@@ -129,6 +175,15 @@ minetest.register_craft({
 	recipe = {"default:sign_wall_wood", "minesweeper:flag"}
 })
 
+minetest.register_craft({
+	output = "minesweeper:detector",
+	recipe = {
+		{"minesweeper:flag"},
+		{"default:mese_crystal"},
+		{"default:steel_ingot"}
+	}
+})
+
 for i=1,26 do
 	minetest.register_node("minesweeper:num_"..i, {
 		description = "Minesweeper Number",
@@ -152,9 +207,8 @@ end
 
 minetest.register_globalstep(function(dtime)
 	for i,v in ipairs(mine_index) do
-		local node = minetest.get_node({x = v.x, y = v.y + 1, z = v.z})
-		local node = minetest.registered_nodes[node.name]
-		if not node.buildable_to then
+		local node = minetest.get_node_or_nil({x = v.x, y = v.y + 1, z = v.z})
+		if node and not minetest.registered_nodes[node.name].buildable_to then
 			boom(v)
 			table.remove(mine_index, i)
 		else
@@ -258,9 +312,9 @@ minetest.register_lbm({
 
 minetest.register_on_punchnode(function(pos, node, puncher, pointed_thing)
 	local node_def = minetest.registered_nodes[node.name]
-	if node_def.drawtype == "normal" and node_def.walkable and not node_def.buildable_to then
+	if node_def and node_def.drawtype == "normal" and node_def.walkable and not node_def.buildable_to then
 		local item_name = puncher:get_wielded_item():get_name()
-		if item_name == "default:stick" or item_name == "minesweeper:flag" then
+		if item_name == "default:stick" or item_name == "minesweeper:flag" or item_name == "minesweeper:detector" then
 			local nodes = minetest.find_nodes_in_area({x = pos.x - 1, y = pos.y - 1, z = pos.z - 1}, {x = pos.x + 1, y = pos.y + 1, z = pos.z + 1}, {"group:place_mine"})
 			local mines = {}
 			for _,v in ipairs(nodes) do
@@ -321,7 +375,7 @@ function minesweeper.register_placable(v)
 	})
 end
 
-local override_nodes = {
+for _,v in ipairs({
 	"default:dirt",
 	"default:dirt_with_grass",
 	"default:dirt_with_grass_footsteps",
@@ -340,8 +394,7 @@ local override_nodes = {
 	"default:gravel",
 	"default:clay",
 	"default:snowblock"
-}
-for _,v in ipairs(override_nodes) do
+}) do
 	minesweeper.register_placable(v)
 end
 
