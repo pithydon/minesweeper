@@ -162,7 +162,7 @@ minetest.register_craft({
 })
 
 minetest.register_craft({
-	output = "minesweeper:flag",
+	output = "minesweeper:flag 4",
 	recipe = {
 		{"wool:red"},
 		{"default:stick"}
