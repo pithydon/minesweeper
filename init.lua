@@ -74,7 +74,9 @@ minetest.register_craftitem("minesweeper:detector", {
 			if vector.distance(pos, v) < 16 then
 				local node = minetest.get_node({x = v.x, y = v.y + 1, z = v.z})
 				if node.name ~= "minesweeper:flag" then
-					minetest.chat_send_player(placer:get_player_name(), "Unflaged mines detected nearby.")
+					local player_name = placer:get_player_name()
+					minetest.chat_send_player(player_name, "Unflaged mines detected nearby.")
+					minetest.sound_play({name = "minesweeper_detect", gain = 0.3}, {to_player = player_name}, true)
 					return
 				else
 					flag = true
@@ -94,7 +96,9 @@ minetest.register_craftitem("minesweeper:detector", {
 			if vector.distance(pos, v) < 16 then
 				local node = minetest.get_node({x = v.x, y = v.y + 1, z = v.z})
 				if node.name ~= "minesweeper:flag" then
-					minetest.chat_send_player(user:get_player_name(), "Unflaged mines detected nearby.")
+					local player_name = user:get_player_name()
+					minetest.chat_send_player(player_name, "Unflaged mines detected nearby.")
+					minetest.sound_play({name = "minesweeper_detect", gain = 0.3}, {to_player = player_name}, true)
 					return
 				else
 					flag = true
@@ -225,6 +229,39 @@ minetest.register_globalstep(function(dtime)
 					end
 				end
 			end
+		end
+	end
+end)
+
+local player_table = {}
+
+minetest.register_globalstep(function(dtime)
+	local stack = ItemStack("minesweeper:detector")
+	for _,player in ipairs(minetest.get_connected_players()) do
+		local inv = player:get_inventory()
+		if inv:contains_item("main", stack) then
+			local pos = player:get_pos()
+			local no_mine = true
+			for _,v in ipairs(mine_index) do
+				if vector.distance(pos, v) < 16 then
+					local node = minetest.get_node({x = v.x, y = v.y + 1, z = v.z})
+					if node.name ~= "minesweeper:flag" then
+						no_mine = false
+						local player_name = player:get_player_name()
+						if not player_table[player_name] then
+							player_table[player_name] = true
+							minetest.chat_send_player(player_name, "Unflaged mines detected nearby.")
+							minetest.sound_play({name = "minesweeper_detect", gain = 0.3}, {to_player = player_name}, true)
+						end
+						break
+					end
+				end
+			end
+			if no_mine then
+				player_table[player:get_player_name()] = false
+			end
+		else
+			player_table[player:get_player_name()] = nil
 		end
 	end
 end)
@@ -412,7 +449,7 @@ minetest.override_item("default:snow", {
 				end
 			end
 			boom(below)
-		elseif item_name == "default:stick" or item_name == "minesweeper:flag" then
+		elseif item_name == "default:stick" or item_name == "minesweeper:flag" or item_name == "minesweeper:detector" then
 			local node = minetest.get_node(below)
 			local node_def = minetest.registered_nodes[node.name]
 			if node_def.drawtype == "normal" and node_def.walkable and not node_def.buildable_to then
