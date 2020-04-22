@@ -50,8 +50,11 @@ minetest.register_craftitem("minesweeper:mine", {
 				return
 			end
 			if minetest.get_item_group(node.name, "place_mine") == 1 then
-				minetest.log("action", player_name.." places minesweeper mine in "..minetest.pos_to_string(pos))
 				local meta = minetest.get_meta(pos)
+				if meta:get_string("minesweeper") == "mine" then
+					return
+				end
+				minetest.log("action", player_name.." places minesweeper mine in "..minetest.pos_to_string(pos))
 				meta:set_string("minesweeper", "mine")
 				table.insert(mine_index, pos)
 				if not creative then
@@ -211,21 +214,23 @@ end
 
 minetest.register_globalstep(function(dtime)
 	for i,v in ipairs(mine_index) do
-		local node = minetest.get_node_or_nil({x = v.x, y = v.y + 1, z = v.z})
-		if node and not minetest.registered_nodes[node.name].buildable_to then
-			boom(v)
+		local meta = minetest.get_meta(v)
+		if meta:get_string("minesweeper") ~= "mine" then
 			table.remove(mine_index, i)
 		else
-			local objects = minetest.get_objects_inside_radius({x = v.x, y = v.y + 1, z = v.z}, 0.5)
-			if objects[1] then
+			local node = minetest.get_node_or_nil({x = v.x, y = v.y + 1, z = v.z})
+			if node and not minetest.registered_nodes[node.name].buildable_to then
 				boom(v)
-				table.remove(mine_index, i)
 			else
-				local objects = minetest.get_objects_inside_radius({x = v.x, y = v.y + 0.1, z = v.z}, 0.8)
-				for _,p in ipairs(objects) do
-					if p:is_player() then
-						boom(v)
-						table.remove(mine_index, i)
+				local objects = minetest.get_objects_inside_radius({x = v.x, y = v.y + 1, z = v.z}, 0.5)
+				if objects[1] then
+					boom(v)
+				else
+					local objects = minetest.get_objects_inside_radius({x = v.x, y = v.y + 0.1, z = v.z}, 0.8)
+					for _,p in ipairs(objects) do
+						if p:is_player() then
+							boom(v)
+						end
 					end
 				end
 			end
@@ -300,13 +305,6 @@ minetest.register_abm({
 	action = function(pos, node)
 		local ontopof = minetest.get_meta({x = pos.x, y = pos.y - 1, z = pos.z})
 		if ontopof:get_string("minesweeper") == "mine" then
-			for i,v in ipairs(mine_index) do
-				local posv = minetest.pos_to_string(v)
-				local poss = minetest.pos_to_string({x = pos.x, y = pos.y - 1, z = pos.z})
-				if posv == poss then
-					table.remove(mine_index, i)
-				end
-			end
 			boom({x = pos.x, y = pos.y - 1, z = pos.z})
 		end
 		local nodes = minetest.find_nodes_in_area({x = pos.x - 1, y = pos.y - 2, z = pos.z - 1}, {x = pos.x + 1, y = pos.y, z = pos.z + 1}, {"group:place_mine"})
@@ -381,13 +379,6 @@ function minesweeper.register_placable(v)
 		on_punch = function(pos, node, puncher, pointed_thing)
 			local meta = minetest.get_meta(pos)
 			if meta:get_string("minesweeper") == "mine" then
-				for i,v in ipairs(mine_index) do
-					local posv = minetest.pos_to_string(v)
-					local poss = minetest.pos_to_string(pos)
-					if posv == poss then
-						table.remove(mine_index, i)
-					end
-				end
 				boom(pos)
 			else
 				minetest.node_punch(pos, node, puncher, pointed_thing)
@@ -396,17 +387,20 @@ function minesweeper.register_placable(v)
 		on_blast = function(pos, intensity)
 			local meta = minetest.get_meta(pos)
 			if meta:get_string("minesweeper") == "mine" then
-				for i,v in ipairs(mine_index) do
-					local posv = minetest.pos_to_string(v)
-					local poss = minetest.pos_to_string(pos)
-					if posv == poss then
-						table.remove(mine_index, i)
-					end
-				end
 				boom(pos)
 			else
 				minetest.remove_node(pos)
 				minetest.add_item(pos, v_def.drop)
+			end
+		end,
+		after_destruct = function(pos)
+			for i,v in ipairs(mine_index) do
+				local posv = minetest.pos_to_string(v)
+				local poss = minetest.pos_to_string(pos)
+				if posv == poss then
+					table.remove(mine_index, i)
+					return
+				end
 			end
 		end
 	})
@@ -441,13 +435,6 @@ minetest.override_item("default:snow", {
 		local meta = minetest.get_meta(below)
 		local item_name = puncher:get_wielded_item():get_name()
 		if meta:get_string("minesweeper") == "mine" then
-			for i,v in ipairs(mine_index) do
-				local posv = minetest.pos_to_string(v)
-				local poss = minetest.pos_to_string(below)
-				if posv == poss then
-					table.remove(mine_index, i)
-				end
-			end
 			boom(below)
 		elseif item_name == "default:stick" or item_name == "minesweeper:flag" or item_name == "minesweeper:detector" then
 			local node = minetest.get_node(below)
