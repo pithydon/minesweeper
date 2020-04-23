@@ -40,6 +40,9 @@ minetest.register_craftitem("minesweeper:mine", {
 			local pos = pointed_thing.under
 			local node = minetest.get_node(pos)
 			local node_def = minetest.registered_nodes[node.name]
+			if not node_def then
+				return
+			end
 			if node_def.buildable_to then
 				pos = {x = pos.x, y = pos.y - 1, z = pos.z}
 				node = minetest.get_node(pos)
@@ -125,7 +128,7 @@ minetest.register_node("minesweeper:flag", {
 	wield_image = "minesweeper_flag.png",
 	sunlight_propagates = true,
 	walkable = false,
-	buildable_to = true,
+	buildable_to = false,
 	groups = {dig_immediate = 3},
 	selection_box = {
 		type = "fixed",
@@ -163,7 +166,7 @@ minetest.register_craft({
 	output = "minesweeper:mine",
 	recipe = {
 		{"default:steel_ingot", "default:steel_ingot", "default:steel_ingot"},
-		{"", "tnt:tnt", ""},
+		{"default:mese_crystal", "tnt:tnt", "default:mese_crystal"},
 		{"default:steel_ingot", "default:steel_ingot", "default:steel_ingot"}
 	}
 })
@@ -201,14 +204,20 @@ for i=1,26 do
 		sunlight_propagates = true,
 		walkable = false,
 		buildable_to = true,
-		groups = {dig_immediate = 2, not_in_creative_inventory = 1},
+		groups = {not_in_creative_inventory = 1},
 		drop = "",
 		selection_box = {
 			type = "wallmounted",
 			wall_top = {-0.5, 0.4375, -0.5, 0.5, 0.5, 0.5},
 			wall_bottom = {-0.5, -0.5, -0.5, 0.5, -0.4375, 0.5},
 			wall_side = {-0.5, -0.5, -0.5, -0.4375, 0.5, 0.5},
-		}
+		},
+		on_punch = function(pos, node, puncher)
+			local item_name = puncher:get_wielded_item():get_name()
+			if item_name ~= "default:stick" and item_name ~= "minesweeper:flag" and item_name ~= "minesweeper:detector" then
+				minetest.remove_node(pos)
+			end
+		end
 	})
 end
 
@@ -219,8 +228,11 @@ minetest.register_globalstep(function(dtime)
 			table.remove(mine_index, i)
 		else
 			local node = minetest.get_node_or_nil({x = v.x, y = v.y + 1, z = v.z})
-			if node and not minetest.registered_nodes[node.name].buildable_to then
-				boom(v)
+			if node and node.name ~= "minesweeper:flag" then
+				local node_def = minetest.registered_nodes[node.name]
+				if node_def and not node_def.buildable_to then
+					boom(v)
+				end
 			else
 				local objects = minetest.get_objects_inside_radius({x = v.x, y = v.y + 1, z = v.z}, 0.5)
 				if objects[1] then
@@ -346,11 +358,16 @@ minetest.register_lbm({
 })
 
 minetest.register_on_punchnode(function(pos, node, puncher, pointed_thing)
-	local node_def = minetest.registered_nodes[node.name]
-	if node_def and node_def.drawtype == "normal" and node_def.walkable and not node_def.buildable_to then
-		local item_name = puncher:get_wielded_item():get_name()
-		if item_name == "default:stick" or item_name == "minesweeper:flag" or item_name == "minesweeper:detector" then
-			local nodes = minetest.find_nodes_in_area({x = pos.x - 1, y = pos.y - 1, z = pos.z - 1}, {x = pos.x + 1, y = pos.y + 1, z = pos.z + 1}, {"group:place_mine"})
+	local item_name = puncher:get_wielded_item():get_name()
+	if item_name == "default:stick" or item_name == "minesweeper:flag" or item_name == "minesweeper:detector" then
+		local node_def = minetest.registered_nodes[node.name]
+		local use_pos = pos
+		if node_def and node_def.buildable_to then
+			use_pos = {x = pos.x, y = pos.y - 1, z = pos.z}
+			node_def = minetest.registered_nodes[minetest.get_node(use_pos).name]
+		end
+		if node_def and node_def.drawtype == "normal" and node_def.walkable and not node_def.buildable_to then
+			local nodes = minetest.find_nodes_in_area({x = use_pos.x - 1, y = use_pos.y - 1, z = use_pos.z - 1}, {x = use_pos.x + 1, y = use_pos.y + 1, z = use_pos.z + 1}, {"group:place_mine"})
 			local mines = {}
 			for _,v in ipairs(nodes) do
 				local meta = minetest.get_meta(v)
@@ -359,10 +376,10 @@ minetest.register_on_punchnode(function(pos, node, puncher, pointed_thing)
 				end
 			end
 			if mines[1] then
-				local above = {x = pos.x, y = pos.y + 1, z = pos.z}
+				local above = {x = use_pos.x, y = use_pos.y + 1, z = use_pos.z}
 				local node = minetest.get_node(above)
 				local node_def = minetest.registered_nodes[node.name]
-				if node_def.buildable_to then
+				if node_def and node_def.buildable_to then
 					minetest.swap_node(above, {name = "minesweeper:num_"..#mines, param2 = 1})
 				end
 			end
@@ -428,32 +445,3 @@ for _,v in ipairs({
 }) do
 	minesweeper.register_placable(v)
 end
-
-minetest.override_item("default:snow", {
-	on_punch = function(pos, node, puncher, pointed_thing)
-		local below = {x = pos.x, y = pos.y - 1, z = pos.z}
-		local meta = minetest.get_meta(below)
-		local item_name = puncher:get_wielded_item():get_name()
-		if meta:get_string("minesweeper") == "mine" then
-			boom(below)
-		elseif item_name == "default:stick" or item_name == "minesweeper:flag" or item_name == "minesweeper:detector" then
-			local node = minetest.get_node(below)
-			local node_def = minetest.registered_nodes[node.name]
-			if node_def.drawtype == "normal" and node_def.walkable and not node_def.buildable_to then
-				local nodes = minetest.find_nodes_in_area({x = below.x - 1, y = below.y - 1, z = below.z - 1}, {x = below.x + 1, y = below.y + 1, z = below.z + 1}, {"group:place_mine"})
-				local mines = {}
-				for _,v in ipairs(nodes) do
-					local meta = minetest.get_meta(v)
-					if meta:get_string("minesweeper") == "mine" then
-						table.insert(mines, v)
-					end
-				end
-				if mines[1] then
-					minetest.swap_node(pos, {name = "minesweeper:num_"..#mines, param2 = 1})
-				end
-			end
-		else
-			minetest.node_punch(pos, node, puncher, pointed_thing)
-		end
-	end,
-})
